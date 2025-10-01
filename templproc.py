@@ -5,7 +5,7 @@ Simple Template Pattern Replacement Script
 This script processes template files by replacing defined patterns with values.
 Supports both single values and multi-column data from files.
 Enhanced with comprehensive pattern validation and force mode support.
-Version: 1.2.0
+Version: 1.2.1
 """
 
 import argparse
@@ -142,7 +142,7 @@ def setup_logging(log_level: str = 'INFO') -> logging.Logger:
     try:
         log_dir = Path.home() / Path(__file__).stem
         log_dir.mkdir(exist_ok=True)
-        log_file = log_dir / 'template_processor.log'
+        log_file = log_dir / f'{Path(__file__).stem}.log'
         file_handler = RotatingFileHandler(log_file, maxBytes=Log.MAX_SIZE,
                                          backupCount=Log.BACKUP_COUNT, encoding='utf-8')
         file_handler.setFormatter(logging.Formatter(

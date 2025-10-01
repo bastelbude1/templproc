@@ -1,0 +1,4 @@
+server:
+  hostname: @hostName@
+  ip: @ipAddress@
+  port: @portNumber@

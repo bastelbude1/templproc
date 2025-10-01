@@ -1,0 +1,4 @@
+server:
+  db-host: @DB-HOST@
+  api-key: @API-KEY@
+  user-id: @USER-ID@

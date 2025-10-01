@@ -1,0 +1,3 @@
+webserver	192.168.1.1	8080
+database	192.168.1.2	5432
+loadbalancer	192.168.1.3	80

@@ -1,0 +1,2 @@
+mydb.example.com	secret-key-123	user-42
+proddb.example.com	secret-key-456	user-99
