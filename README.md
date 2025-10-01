@@ -83,6 +83,23 @@ Arguments Details:
     • Default allowed extensions: .txt, .conf, .yaml, .yml, .json, .xml, .cfg, .ini, .template, .tpl
     • Use --allow-any-filetype to bypass extension check
 
+  -p, --project:
+    • Project name for organizing output into subdirectories
+    • Files are created in: <output_dir>/<project>/
+    • Example: -o /tmp/output -p myproject → files in /tmp/output/myproject/
+    • Useful for separating multiple runs, environments, or datasets
+    • Default: project_<PID> (e.g., project_12345)
+    • Use cases:
+      - Multiple environments: -p dev, -p staging, -p prod
+      - Dataset versions: -p dataset_v1, -p dataset_v2
+      - Date-based runs: -p run_2025-01-15
+
+  -o, --output_dir:
+    • Base output directory (combined with project name)
+    • Final path: <output_dir>/<project>/
+    • Default: current_dir/<project>
+    • Example: -o /var/output -p myproj → /var/output/myproj/
+
   -f, --force:
     • Continue processing when template contains undefined patterns
     • Warns instead of erroring
@@ -132,6 +149,28 @@ templproc -V values.txt -P "@VALUE@" -T "template_*.conf" -r
 ### Template directory: Process all templates in a folder
 ```bash
 templproc -V values.txt -P "@VALUE@" -T /path/to/templates/ -r
+```
+
+### Project organization: Separate environments
+```bash
+# Development environment
+templproc -V dev_values.txt -P "@HOST@,@PORT@" -T config.yaml -o /var/configs -p dev -r
+
+# Staging environment
+templproc -V staging_values.txt -P "@HOST@,@PORT@" -T config.yaml -o /var/configs -p staging -r
+
+# Production environment
+templproc -V prod_values.txt -P "@HOST@,@PORT@" -T config.yaml -o /var/configs -p prod -r
+```
+**Result:** Creates organized structure:
+```
+/var/configs/
+├── dev/
+│   └── config_line0001.yaml
+├── staging/
+│   └── config_line0001.yaml
+└── prod/
+    └── config_line0001.yaml
 ```
 
 ### Force mode: Continue with missing patterns

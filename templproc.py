@@ -202,8 +202,10 @@ Examples:
                        help='Execute replacement (default is dry-run)')
     parser.add_argument('-f', '--force', action='store_true',
                        help='Force processing - warn about missing patterns instead of erroring')
-    parser.add_argument('-p', '--project', help='Project name (default: current PID)')
-    parser.add_argument('-o', '--output_dir', help='Output directory (default: current_dir/<project>)')
+    parser.add_argument('-p', '--project',
+                       help='Project name for organizing output subdirectory. Files are created in <output_dir>/<project>/. Useful for separating multiple runs or environments (default: project_<PID>)')
+    parser.add_argument('-o', '--output_dir',
+                       help='Base output directory. Combined with project name to create <output_dir>/<project>/ (default: current_dir/<project>)')
     parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        default='INFO', help='Set logging level')
     parser.add_argument('--allow-mixed-case', action='store_true',
