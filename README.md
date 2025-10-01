@@ -8,14 +8,14 @@ Simple yet powerful template pattern replacement script for task automation. Rep
 
 ## Key Features
 
-✅ **Flexible Pattern Delimiters**: Support for `@PATTERN@` and `%PATTERN%` formats
-✅ **Multiple Value Delimiters**: TAB, semicolon, or newline in value files
-✅ **Multi-Row Processing**: Generate separate files for each value row
-✅ **Multiple Templates**: Process multiple templates with wildcards or directories
-✅ **Force Mode**: Continue processing with missing patterns (multi-stage pipelines)
-✅ **Security Built-in**: Path traversal protection, symlink attack prevention, null byte filtering
-✅ **Dry-Run Mode**: Preview changes before execution
-✅ **Comprehensive Testing**: 52 automated tests, 100% passing
+- ✅ **Flexible Pattern Delimiters**: Support for `@PATTERN@` and `%PATTERN%` formats
+- ✅ **Multiple Value Delimiters**: TAB, semicolon, or newline in value files
+- ✅ **Multi-Row Processing**: Generate separate files for each value row
+- ✅ **Multiple Templates**: Process multiple templates with wildcards or directories
+- ✅ **Force Mode**: Continue processing with missing patterns (multi-stage pipelines)
+- ✅ **Security Built-in**: Path traversal protection, symlink attack prevention, null byte filtering
+- ✅ **Dry-Run Mode**: Preview changes before execution
+- ✅ **Comprehensive Testing**: 52 automated tests, 100% passing
 
 ## Diagram
 
