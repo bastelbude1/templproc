@@ -20,7 +20,7 @@ from typing import List, Dict, Tuple, Optional
 from contextlib import contextmanager
 
 # Script version
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # Exit codes for automation/scripting
 
