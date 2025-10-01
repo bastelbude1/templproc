@@ -32,29 +32,38 @@ usage: templproc [-h] -V VALUES -P PATTERN -T TEMPLATE [-r] [-f]
 
 Simple Template Pattern Replacement Script
 
-Required arguments:
+options:
+  -h, --help            show this help message and exit
+
+required arguments:
   -V VALUES, --Values VALUES
                         Comma-separated values or file path (supports TAB,
                         semicolon, newline delimiters)
   -P PATTERN, --Pattern PATTERN
-                        Comma-separated patterns (e.g., "@HOST@,@IP@,@PORT@" or
-                        "%HOST%,%IP%,%PORT%")
+                        Comma-separated patterns in @PATTERN@ format (e.g.,
+                        "@HOST@,@IP@)
   -T TEMPLATE, --Template TEMPLATE
-                        Template file, directory, or wildcard pattern
+                        Template file, directory, or wildcard pattern (e.g.,
+                        "template_*.txt")
 
-Optional arguments:
-  -h, --help            Show this help message and exit
+optional arguments:
   -r, --run             Execute replacement (default is dry-run)
-  -f, --force           Force mode: warn about missing patterns instead of erroring
+  -f, --force           Force processing - warn about missing patterns instead
+                        of erroring
   -p PROJECT, --project PROJECT
-                        Project name (default: current PID)
+                        Project name for organizing output subdirectory
+                        (default: project_<PID>)
   -o OUTPUT_DIR, --output_dir OUTPUT_DIR
-                        Output directory (default: current_dir/<project>)
+                        Base output directory combined with project name
+                        (default: ./<project>)
   --log-level {DEBUG,INFO,WARNING,ERROR}
                         Set logging level (default: INFO)
-  --allow-mixed-case    Allow mixed case patterns (e.g., @hostName@, @dbHost@)
-  --allow-hyphens       Allow hyphens in patterns (e.g., @db-host@, @api-key@)
-  --allow-any-filetype  Allow any template file extension
+  --allow-mixed-case    Allow mixed case in pattern names (e.g., @HostName@,
+                        @dbHost@)
+  --allow-hyphens       Allow hyphens in pattern names (e.g., @db-host@, @api-
+                        key@)
+  --allow-any-filetype  Allow any file extension for templates (bypasses
+                        extension whitelist)
   --version             Show version and exit
 
 Arguments Details:
