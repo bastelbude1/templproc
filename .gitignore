@@ -1,0 +1,45 @@
+# Claude Code files
+.claude/
+*.claude
+
+# Credentials and sensitive data
+*.pem
+*.key
+*_rsa
+*_ed25519
+*.pub
+credentials.json
+secrets.yaml
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows Zone Identifier files
+*:Zone.Identifier
+
+# Logs and runtime data
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project output directories
+project_*/
