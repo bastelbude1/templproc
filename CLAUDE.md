@@ -135,3 +135,51 @@ python3 templproc.py -V data.txt -P "@VAL@" -T template.yaml -r -p myproject -o 
 - **Force mode** (`-f`): Allows unreplaced patterns with warnings (for multi-stage workflows)
 - **Case sensitivity**: Warns if pattern case mismatches between template and provided patterns
 - **Progress reporting**: Shows percentage for jobs with 20+ tasks
+
+## Development Workflow
+
+### Code Review Requirements
+
+**MANDATORY**: Before pushing **code changes** to GitHub, ALWAYS run CodeRabbit code review:
+
+```bash
+/home/baste/.local/bin/coderabbit review --prompt-only --type committed --base-commit HEAD~5
+```
+
+**When CodeRabbit review is REQUIRED:**
+- ✅ Changes to `templproc.py` (main script)
+- ✅ Changes to test files in `tests/`
+- ✅ Changes to test scripts (`run_tests.sh`)
+
+**When CodeRabbit review is NOT required:**
+- ❌ Documentation-only changes (README.md, CLAUDE.md)
+- ❌ Tarball rebuilds (no code changes)
+- ❌ Version history updates
+
+**Process:**
+1. Make code changes and commit locally
+2. Run CodeRabbit review with `--prompt-only` flag
+3. Fix any issues found by CodeRabbit
+4. Re-run CodeRabbit if fixes were made
+5. Only push to GitHub after CodeRabbit review passes with no issues
+
+**Important Notes:**
+- CodeRabbit has rate limits (~1 hour between large reviews)
+- Use `--base-commit HEAD~N` to review last N commits
+- The `--prompt-only` flag shows what CodeRabbit would tell an AI to fix
+- Fix all reported issues before pushing
+- Rebuild and push tarball after any code/documentation changes
+
+### Release Checklist
+
+When releasing a new version:
+1. ✅ Update version number in `templproc.py` (`__version__`)
+2. ✅ Update version in `README.md` (Version History section)
+3. ✅ Run full test suite: `cd tests && bash run_tests.sh`
+4. ✅ Verify 100% test pass rate (52/52 tests)
+5. ✅ Run CodeRabbit review: `/home/baste/.local/bin/coderabbit review --prompt-only`
+6. ✅ Fix any CodeRabbit issues
+7. ✅ Rebuild tarball: `tar -czf templproc-X.Y.Z.tar.gz --exclude='.git' --exclude='.claude' --exclude='.gitignore' --exclude='CLAUDE.md' --exclude='*.log' templproc/templproc.py templproc/README.md templproc/templproc.png templproc/tests/`
+8. ✅ Commit and push all changes including tarball
+9. ✅ Create git tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
+10. ✅ Push tags: `git push --tags`
