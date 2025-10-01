@@ -41,7 +41,7 @@ required arguments:
                         semicolon, newline delimiters)
   -P PATTERN, --Pattern PATTERN
                         Comma-separated patterns in @PATTERN@ format (e.g.,
-                        "@HOST@,@IP@)
+                        "@HOST@,@IP@")
   -T TEMPLATE, --Template TEMPLATE
                         Template file, directory, or wildcard pattern (e.g.,
                         "template_*.txt")

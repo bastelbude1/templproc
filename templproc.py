@@ -214,7 +214,7 @@ Examples:
     required.add_argument('-V', '--Values', required=True,
                        help='Comma-separated values or file path (supports TAB, semicolon, newline delimiters)')
     required.add_argument('-P', '--Pattern', required=True,
-                       help='Comma-separated patterns in @PATTERN@ format (e.g., "@HOST@,@IP@)')
+                       help='Comma-separated patterns in @PATTERN@ format (e.g., "@HOST@,@IP@")')
     required.add_argument('-T', '--Template', required=True,
                        help='Template file, directory, or wildcard pattern (e.g., "template_*.txt")')
 
