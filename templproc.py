@@ -158,11 +158,12 @@ def parse_arguments():
 
     """Parse command line arguments."""
 
+    prog_name = os.path.basename(sys.argv[0])
     parser = argparse.ArgumentParser(
+        prog=prog_name,
         description="Simple Template Pattern Replacement Script",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-
+        epilog=f"""
 Arguments Details:
   -V, --Values:
     • Comma-separated values: "value1,value2,value3"
@@ -170,52 +171,74 @@ Arguments Details:
     • Supported delimiters in files: TAB, semicolon (;), or newline
     • Comments starting with # are ignored
     • Maximum 3000 lines in value files
+
   -P, --Pattern:
     • One or more comma-separated patterns: "@HOST@,@IP@,@PORT@"
     • Must be in format @PATTERN_NAME@ (uppercase, underscores, numbers)
     • Number of patterns should match values per line
+
   -T, --Template:
     • Single template file: "config.yaml"
     • Directory containing templates: "/path/to/templates/"
     • Shell wildcards: "template_*.txt" (expanded by shell)
     • Supported extensions: .txt, .conf, .yaml, .yml, .json, .xml, .cfg, .ini, .template, .tpl
     • Maximum 100KB per template file
+
+  -p, --project:
+    • Project name for organizing output subdirectory
+    • Creates structure: <output_dir>/<project>/
+    • Default: project_<PID>
+
+  -o, --output_dir:
+    • Base output directory (combined with project name)
+    • Final path: <output_dir>/<project>/
+    • Default: ./<project>
+
   -f, --force:
     • Force processing mode - warns about missing patterns instead of erroring
     • Useful for multi-stage template processing
     • Allows unreplaced patterns in output files
+
 Examples:
-  python template-processor.py -V "server1,server2,server3" -P "@HOSTNAME@" -T template.txt -r
-  python template-processor.py -V servers.txt -P "@HOST@,@IP@,@PORT@" -T config.yaml -r
-  python template-processor.py -V values.txt -P "@VALUE@" -T "template_*.conf" -r
-  python template-processor.py -V partial.txt -P "@HOST@" -T template.yaml -r --force
+  {prog_name} -V "server1,server2,server3" -P "@HOSTNAME@" -T template.txt -r
+  {prog_name} -V servers.txt -P "@HOST@,@IP@,@PORT@" -T config.yaml -r
+  {prog_name} -V values.txt -P "@VALUE@" -T "template_*.conf" -r
+  {prog_name} -V partial.txt -P "@HOST@" -T template.yaml -r --force
+  {prog_name} -V dev.txt -P "@HOST@" -T config.yaml -o /var/configs -p dev -r
         """
 
     )
-    parser.add_argument('-V', '--Values', required=True,
+
+    # Required arguments
+    required = parser.add_argument_group('required arguments')
+    required.add_argument('-V', '--Values', required=True,
                        help='Comma-separated values or file path (supports TAB, semicolon, newline delimiters)')
-    parser.add_argument('-P', '--Pattern', required=True,
+    required.add_argument('-P', '--Pattern', required=True,
                        help='Comma-separated patterns in @PATTERN@ format (e.g., "@HOST@,@IP@)')
-    parser.add_argument('-T', '--Template', required=True,
+    required.add_argument('-T', '--Template', required=True,
                        help='Template file, directory, or wildcard pattern (e.g., "template_*.txt")')
-    parser.add_argument('-r', '--run', action='store_true',
+
+    # Optional arguments
+    optional = parser.add_argument_group('optional arguments')
+    optional.add_argument('-r', '--run', action='store_true',
                        help='Execute replacement (default is dry-run)')
-    parser.add_argument('-f', '--force', action='store_true',
+    optional.add_argument('-f', '--force', action='store_true',
                        help='Force processing - warn about missing patterns instead of erroring')
-    parser.add_argument('-p', '--project',
-                       help='Project name for organizing output subdirectory. Files are created in <output_dir>/<project>/. Useful for separating multiple runs or environments (default: project_<PID>)')
-    parser.add_argument('-o', '--output_dir',
-                       help='Base output directory. Combined with project name to create <output_dir>/<project>/ (default: current_dir/<project>)')
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-                       default='INFO', help='Set logging level')
-    parser.add_argument('--allow-mixed-case', action='store_true',
+    optional.add_argument('-p', '--project',
+                       help='Project name for organizing output subdirectory (default: project_<PID>)')
+    optional.add_argument('-o', '--output_dir',
+                       help='Base output directory combined with project name (default: ./<project>)')
+    optional.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                       default='INFO', help='Set logging level (default: INFO)')
+    optional.add_argument('--allow-mixed-case', action='store_true',
                        help='Allow mixed case in pattern names (e.g., @HostName@, @dbHost@)')
-    parser.add_argument('--allow-hyphens', action='store_true',
+    optional.add_argument('--allow-hyphens', action='store_true',
                        help='Allow hyphens in pattern names (e.g., @db-host@, @api-key@)')
-    parser.add_argument('--allow-any-filetype', action='store_true',
+    optional.add_argument('--allow-any-filetype', action='store_true',
                        help='Allow any file extension for templates (bypasses extension whitelist)')
-    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}',
+    optional.add_argument('--version', action='version', version=f'%(prog)s {__version__}',
                        help='Show version and exit')
+
     return parser.parse_args()
 
 def find_all_patterns_in_template(content: str, delimiter: str = '@') -> List[str]:
