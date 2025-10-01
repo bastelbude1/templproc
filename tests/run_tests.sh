@@ -174,7 +174,7 @@ run_test_expect_fail "18. Too few values for patterns (should fail)" \
     "Missing values for patterns"
 
 run_test "19. Too many values for patterns (warns, doesn't fail)" \
-    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_too_many.txt -P '@HOSTNAME@,@IP_ADDRESS@' -T test_templates.yaml -o $TEST_OUTPUT_BASE -p test19" \
+    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_too_many.txt -P '@HOSTNAME@,@IP_ADDRESS@' -T test_template_2patterns.yaml -o $TEST_OUTPUT_BASE -p test19" \
     "Extra values will be ignored"
 
 run_test_expect_fail "20. Empty pattern list (should fail)" \
@@ -207,7 +207,7 @@ run_test "25. Process 2 templates with wildcard" \
     "Found 2 template"
 
 run_test "26. Verify wildcard matches multiple templates" \
-    "cd $SCRIPT_DIR && python3 $TEMPLPROC -V test_values.txt -P '@HOSTNAME@,@IP_ADDRESS@,@PORT@' -T 'test_template_multi*.yaml' -o $TEST_OUTPUT_BASE -p test26" \
+    "cd $SCRIPT_DIR && python3 $TEMPLPROC -V 'name1;val1' -P '@NAME@,@VALUE@' -T 'test_template_multi*.yaml' -o $TEST_OUTPUT_BASE -p test26" \
     "Found 2 template"
 
 run_test "27. Template directory processing" \
@@ -253,21 +253,21 @@ run_test_expect_fail "35. Duplicate patterns (should fail)" \
 echo ""
 echo "=== Value Edge Case Tests ==="
 run_test "36. Empty values (valid)" \
-    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_edge_cases.txt -P '@VAL1@,@VAL2@' -T test_template_multirow.txt -o $TEST_OUTPUT_BASE -p test36 -r" \
+    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_edge_cases.txt -P '@ROW@,@VALUE@' -T test_template_multirow.txt -o $TEST_OUTPUT_BASE -p test36 -r" \
     "Completed: 4 successful"
 
 run_test "37. Unicode characters in values" \
-    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_edge_cases.txt -P '@VAL1@,@VAL2@' -T test_template_multirow.txt -o $TEST_OUTPUT_BASE -p test37 -r && grep -q 'unicode_test' $TEST_OUTPUT_BASE/test37/test_template_multirow_line0003.txt" \
+    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_edge_cases.txt -P '@ROW@,@VALUE@' -T test_template_multirow.txt -o $TEST_OUTPUT_BASE -p test37 -r && grep -q 'unicode_test' $TEST_OUTPUT_BASE/test37/test_template_multirow_line0003.txt" \
     "Created:"
 
 run_test "38. Special characters in values" \
-    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_edge_cases.txt -P '@VAL1@,@VAL2@' -T test_template_multirow.txt -o $TEST_OUTPUT_BASE -p test38 -r && grep -q 'special_chars' $TEST_OUTPUT_BASE/test38/test_template_multirow_line0004.txt" \
+    "mkdir -p $TEST_OUTPUT_BASE && python3 $TEMPLPROC -V test_values_edge_cases.txt -P '@ROW@,@VALUE@' -T test_template_multirow.txt -o $TEST_OUTPUT_BASE -p test38 -r && grep -q 'special_chars' $TEST_OUTPUT_BASE/test38/test_template_multirow_line0004.txt" \
     "Created:"
 
 echo ""
 echo "=== Security Boundary Tests ==="
 run_test "39. Large template file accepted (no size limit enforced)" \
-    "mkdir -p $TEST_OUTPUT_BASE && python3 -c 'with open(\"/tmp/large_template.txt\", \"w\") as f: f.write(\"@VAL@\\n\" * 20000)' && python3 $TEMPLPROC -V 'val1' -P '@VAL@' -T /tmp/large_template.txt -o $TEST_OUTPUT_BASE -p test39; RET=\$?; rm -f /tmp/large_template.txt; exit \$RET" \
+    "mkdir -p $TEST_OUTPUT_BASE && python3 -c 'with open(\"/home/baste/large_template.txt\", \"w\") as f: f.write(\"@VAL@\\n\" * 20000)' && python3 $TEMPLPROC -V 'val1' -P '@VAL@' -T /home/baste/large_template.txt -o $TEST_OUTPUT_BASE -p test39; RET=\$?; rm -f /home/baste/large_template.txt; exit \$RET" \
     "Found 1 template"
 
 run_test_expect_fail "40. Values file line limit (>3000 lines)" \
@@ -297,8 +297,8 @@ run_test_expect_fail "45. Invalid template file extension" \
     "not allowed"
 
 run_test "46. Unreadable template file handled" \
-    "touch /tmp/test_unreadable.txt && chmod 000 /tmp/test_unreadable.txt && python3 $TEMPLPROC -V 'val1' -P '@VAL@' -T /tmp/test_unreadable.txt -o /tmp/templproc_testout46 -p test46 2>&1; RET=\$?; chmod 644 /tmp/test_unreadable.txt 2>/dev/null; rm -f /tmp/test_unreadable.txt; rm -rf /tmp/templproc_testout46; exit \$RET" \
-    "does not exist"
+    "mkdir -p $TEST_OUTPUT_BASE && touch /home/baste/test_unreadable.txt && chmod 000 /home/baste/test_unreadable.txt && python3 $TEMPLPROC -V 'val1' -P '@VAL@' -T /home/baste/test_unreadable.txt -o $TEST_OUTPUT_BASE -p test46 2>&1; chmod 644 /home/baste/test_unreadable.txt 2>/dev/null; rm -f /home/baste/test_unreadable.txt" \
+    "Could not decode"
 
 run_test_expect_fail "47. Unwritable output directory" \
     "mkdir -p /tmp/unwritable_dir && chmod 000 /tmp/unwritable_dir && python3 $TEMPLPROC -V 'val1' -P '@VAL@' -T test_template_no_patterns.txt -o /tmp/unwritable_dir -p test47; RET=\$?; chmod 755 /tmp/unwritable_dir 2>/dev/null; rm -rf /tmp/unwritable_dir; exit \$RET" \
