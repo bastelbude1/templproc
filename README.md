@@ -278,7 +278,3 @@ bash run_tests.sh
 
 - Python 3.6+
 - No external dependencies (uses only Python standard library)
-
-## License
-
-See repository for license information.
