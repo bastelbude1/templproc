@@ -1,0 +1,3 @@
+template1:
+  name: @NAME@
+  value: @VALUE@

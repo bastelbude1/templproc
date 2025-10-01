@@ -1,0 +1,4 @@
+emptyvalue	secondval
+trailing_space	value_with_space
+unicode_test	Ü†F-8_tëst_§
+special_chars	val<>&"'

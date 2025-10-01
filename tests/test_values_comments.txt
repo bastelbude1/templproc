@@ -1,0 +1,7 @@
+# This is a comment
+srv1	10.0.0.1	22
+# Another comment
+srv2	10.0.0.2	22
+
+# Empty line above is ignored
+srv3	10.0.0.3	22

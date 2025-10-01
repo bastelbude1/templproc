@@ -1,0 +1,2 @@
+host1	192.168.1.1	80	extra1	extra2
+host2	192.168.1.2	80	extra3	extra4

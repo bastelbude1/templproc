@@ -5,7 +5,7 @@ Simple Template Pattern Replacement Script
 This script processes template files by replacing defined patterns with values.
 Supports both single values and multi-column data from files.
 Enhanced with comprehensive pattern validation and force mode support.
-Version: 1.2.1
+Version: 1.3.0
 """
 
 import argparse

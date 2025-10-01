@@ -1,0 +1,3 @@
+This template has no patterns.
+It should just be copied as-is.
+No replacements needed.
