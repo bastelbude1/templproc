@@ -5,7 +5,7 @@ Simple Template Pattern Replacement Script
 This script processes template files by replacing defined patterns with values.
 Supports both single values and multi-column data from files.
 Enhanced with comprehensive pattern validation and force mode support.
-Version: 1.1.0
+Version: 1.2.0
 """
 
 import argparse
@@ -20,7 +20,7 @@ from typing import List, Dict, Tuple, Optional
 from contextlib import contextmanager
 
 # Script version
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Exit codes for automation/scripting
 
@@ -206,23 +206,39 @@ Examples:
     parser.add_argument('-o', '--output_dir', help='Output directory (default: current_dir/<project>)')
     parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        default='INFO', help='Set logging level')
+    parser.add_argument('--allow-mixed-case', action='store_true',
+                       help='Allow mixed case in pattern names (e.g., @HostName@, @dbHost@)')
+    parser.add_argument('--allow-hyphens', action='store_true',
+                       help='Allow hyphens in pattern names (e.g., @db-host@, @api-key@)')
+    parser.add_argument('--allow-any-filetype', action='store_true',
+                       help='Allow any file extension for templates (bypasses extension whitelist)')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}',
                        help='Show version and exit')
     return parser.parse_args()
 
-def find_all_patterns_in_template(content: str) -> List[str]:
+def find_all_patterns_in_template(content: str, delimiter: str = '@') -> List[str]:
+    """Find all pattern tokens in template content.
 
-    """Find all @PATTERN@ tokens in template content."""
+    Args:
+        content: Template content to scan
+        delimiter: Delimiter character (@ or %)
 
-    pattern_regex = r'@[A-Z_][A-Z0-9_]*@'
+    Returns:
+        List of unique patterns found
+    """
+    # Build regex for pattern detection
+    # Pattern can be: UPPERCASE, lowercase, or mixed (we're just finding them, not validating)
+    # Can contain: letters, numbers, underscores, hyphens
+    escaped_delim = re.escape(delimiter)
+    pattern_regex = f'{escaped_delim}[a-zA-Z_][a-zA-Z0-9_-]*{escaped_delim}'
     return list(set(re.findall(pattern_regex, content)))
 
 def validate_template_patterns(template_content: str, provided_patterns: List[str],
-
-                             template_name: str, force_mode: bool, logger: logging.Logger) -> None:
+                             template_name: str, force_mode: bool, delimiter: str,
+                             logger: logging.Logger) -> None:
     """Validate that all template patterns have corresponding provided patterns."""
 
-    found_patterns = find_all_patterns_in_template(template_content)
+    found_patterns = find_all_patterns_in_template(template_content, delimiter)
     missing_patterns = [p for p in found_patterns if p not in provided_patterns]
     if missing_patterns:
         message = f"Template '{template_name}' contains patterns without values: {missing_patterns}"
@@ -234,11 +250,11 @@ def validate_template_patterns(template_content: str, provided_patterns: List[st
         logger.debug(f"Template '{template_name}' contains patterns: {found_patterns}")
 
 def validate_no_unreplaced_patterns(processed_content: str, template_name: str,
+                                   line_num: int, force_mode: bool, delimiter: str,
+                                   logger: logging.Logger) -> None:
+    """Ensure no pattern tokens remain in processed content."""
 
-                                   line_num: int, force_mode: bool, logger: logging.Logger) -> None:
-    """Ensure no @PATTERN@ tokens remain in processed content."""
-
-    remaining_patterns = find_all_patterns_in_template(processed_content)
+    remaining_patterns = find_all_patterns_in_template(processed_content, delimiter)
     if remaining_patterns:
         message = f"Unreplaced patterns in {template_name} line {line_num}: {remaining_patterns}"
         if force_mode:
@@ -383,10 +399,21 @@ def parse_values(values_input: str, logger: logging.Logger) -> List[List[str]]:
     logger.info(f"Parsed {len(values)} value rows")
     return values
 
-def parse_patterns(pattern_str: str) -> List[str]:
+def parse_patterns(pattern_str: str, allow_mixed_case: bool = False,
+                   allow_hyphens: bool = False) -> Tuple[List[str], str]:
+    """Parse and validate comma-separated patterns with delimiter auto-detection.
 
-    """Parse and validate comma-separated patterns."""
+    Args:
+        pattern_str: Comma-separated patterns (e.g., "@HOST@,@IP@" or "%HOST%,%IP%")
+        allow_mixed_case: Allow mixed case in pattern names
+        allow_hyphens: Allow hyphens in pattern names
 
+    Returns:
+        Tuple of (pattern_list, delimiter_char)
+
+    Raises:
+        ValueError: If patterns are invalid or use inconsistent delimiters
+    """
     try:
         patterns = [pattern.strip() for pattern in pattern_str.split(',') if pattern.strip()]
 
@@ -394,13 +421,73 @@ def parse_patterns(pattern_str: str) -> List[str]:
         if not patterns:
             raise ValueError("No patterns provided")
 
-        # Validate pattern format - assign $ to variable to avoid issues
-        end_anchor = '$'
-        pattern_regex = r'^@[A-Z_][A-Z0-9_]*@' + end_anchor
+        # Auto-detect delimiter from first pattern
+        first_pattern = patterns[0]
+        if first_pattern.startswith('@') and first_pattern.endswith('@'):
+            delimiter = '@'
+        elif first_pattern.startswith('%') and first_pattern.endswith('%'):
+            delimiter = '%'
+        else:
+            raise ValueError(
+                f"Invalid pattern format: '{first_pattern}'. "
+                f"Patterns must use @PATTERN@ or %PATTERN% format"
+            )
+
+        # Validate all patterns use the same delimiter
+        for pattern in patterns:
+            if not (pattern.startswith(delimiter) and pattern.endswith(delimiter)):
+                raise ValueError(
+                    f"Inconsistent delimiters: pattern '{pattern}' doesn't use '{delimiter}' delimiter. "
+                    f"All patterns must use the same delimiter ({delimiter}PATTERN{delimiter})"
+                )
+
+        # Build validation regex based on flags
+        # Pattern name rules:
+        # - Must start with letter or underscore
+        # - Can contain letters, numbers, underscores
+        # - Optionally hyphens (if flag set)
+        # - Case depends on flag
+
+        if allow_mixed_case:
+            if allow_hyphens:
+                # Allow: letters (any case), numbers, underscores, hyphens
+                char_class = r'[a-zA-Z_][a-zA-Z0-9_-]*'
+            else:
+                # Allow: letters (any case), numbers, underscores
+                char_class = r'[a-zA-Z_][a-zA-Z0-9_]*'
+        else:
+            if allow_hyphens:
+                # Allow: uppercase letters, numbers, underscores, hyphens
+                char_class = r'[A-Z_][A-Z0-9_-]*'
+            else:
+                # Allow: uppercase letters, numbers, underscores (current default)
+                char_class = r'[A-Z_][A-Z0-9_]*'
+
+        # Escape delimiter for regex and build pattern
+        escaped_delim = re.escape(delimiter)
+        pattern_regex = f'^{escaped_delim}{char_class}{escaped_delim}$'
+
+        # Validate each pattern
         for pattern in patterns:
             if not re.match(pattern_regex, pattern):
-                raise ValueError(f"Invalid pattern format: '{pattern}'. Use @PATTERN_NAME@")
-        return patterns
+                # Provide helpful error message
+                if not allow_mixed_case and pattern.lower() != pattern and pattern.upper() != pattern:
+                    raise ValueError(
+                        f"Invalid pattern format: '{pattern}'. "
+                        f"Mixed case not allowed (use --allow-mixed-case to enable)"
+                    )
+                elif not allow_hyphens and '-' in pattern:
+                    raise ValueError(
+                        f"Invalid pattern format: '{pattern}'. "
+                        f"Hyphens not allowed (use --allow-hyphens to enable)"
+                    )
+                else:
+                    raise ValueError(
+                        f"Invalid pattern format: '{pattern}'. "
+                        f"Use {delimiter}PATTERN_NAME{delimiter} format"
+                    )
+
+        return patterns, delimiter
     except Exception as e:
         raise ValueError(f"Error parsing patterns: {e}")
 
@@ -447,13 +534,14 @@ def load_and_validate_template(template_file: Path, content_cache: Dict[Path, st
     logger.debug(f"Cached content for {template_file.name}")
     return content
 
-def get_templates(template_path: str, logger: logging.Logger) -> List[Path]:
+def get_templates(template_path: str, allow_any_filetype: bool, logger: logging.Logger) -> List[Path]:
     """Get list of template files with wildcard support.
 
     Resolves all paths to canonical form for security.
 
     Args:
         template_path: Path to template file, directory, or wildcard pattern
+        allow_any_filetype: If True, skip file extension validation
         logger: Logger instance
 
     Returns:
@@ -471,18 +559,27 @@ def get_templates(template_path: str, logger: logging.Logger) -> List[Path]:
             # Resolve to canonical path (follows symlinks)
             try:
                 resolved = path.resolve(strict=True)
+                # Validate extension unless bypassed
+                if not allow_any_filetype and resolved.suffix.lower() not in ALLOWED_EXTENSIONS:
+                    raise ValueError(
+                        f"File extension '{resolved.suffix}' not allowed. "
+                        f"Use --allow-any-filetype to bypass this check. "
+                        f"Allowed extensions: {ALLOWED_EXTENSIONS}"
+                    )
                 templates = [resolved]
             except (OSError, RuntimeError) as e:
                 raise ValueError(f"Cannot resolve template path {path}: {e}")
         elif path.is_dir():
             for f in path.iterdir():
-                if f.is_file() and f.suffix.lower() in ALLOWED_EXTENSIONS:
-                    try:
-                        resolved = f.resolve(strict=True)
-                        templates.append(resolved)
-                    except (OSError, RuntimeError) as e:
-                        logger.warning(f"Cannot resolve template path {f}: {e}")
-                        continue
+                # Check extension only if validation enabled
+                if allow_any_filetype or f.suffix.lower() in ALLOWED_EXTENSIONS:
+                    if f.is_file():
+                        try:
+                            resolved = f.resolve(strict=True)
+                            templates.append(resolved)
+                        except (OSError, RuntimeError) as e:
+                            logger.warning(f"Cannot resolve template path {f}: {e}")
+                            continue
             if not templates:
                 raise ValueError(f"No valid template files found in {template_path}")
     else:
@@ -492,13 +589,15 @@ def get_templates(template_path: str, logger: logging.Logger) -> List[Path]:
         if matches:
             for match in matches:
                 f = Path(match)
-                if f.is_file() and f.suffix.lower() in ALLOWED_EXTENSIONS:
-                    try:
-                        resolved = f.resolve(strict=True)
-                        templates.append(resolved)
-                    except (OSError, RuntimeError) as e:
-                        logger.warning(f"Cannot resolve template path {f}: {e}")
-                        continue
+                # Check extension only if validation enabled
+                if allow_any_filetype or f.suffix.lower() in ALLOWED_EXTENSIONS:
+                    if f.is_file():
+                        try:
+                            resolved = f.resolve(strict=True)
+                            templates.append(resolved)
+                        except (OSError, RuntimeError) as e:
+                            logger.warning(f"Cannot resolve template path {f}: {e}")
+                            continue
             if not templates:
                 raise ValueError(f"No valid template files found matching pattern: {template_path}")
         else:
@@ -644,12 +743,13 @@ def process_template_with_patterns(content: str, patterns: List[str], values: Li
             total_replacements += count
     return result, total_replacements
 
-def generate_filename(template_file: Path, line_number: int) -> str:
+def generate_filename(template_file: Path, line_number: int, allow_any_filetype: bool = False) -> str:
     """Generate output filename with security validation.
 
     Args:
         template_file: Template file path
         line_number: Line number for filename
+        allow_any_filetype: If True, skip file extension validation
 
     Returns:
         Safe filename string
@@ -663,12 +763,12 @@ def generate_filename(template_file: Path, line_number: int) -> str:
     # Security: Validate and sanitize the suffix
     suffix = template_file.suffix.lower()
 
-    # Reject suffixes containing path separators or traversal sequences
+    # Reject suffixes containing path separators or traversal sequences (ALWAYS CHECK)
     if '/' in suffix or '\\' in suffix or '..' in suffix:
         raise ValueError(f"Unsafe file extension containing path separators: {template_file.suffix}")
 
-    # Validate suffix is in allowed extensions
-    if suffix not in ALLOWED_EXTENSIONS:
+    # Validate suffix is in allowed extensions (unless bypassed)
+    if not allow_any_filetype and suffix not in ALLOWED_EXTENSIONS:
         raise ValueError(f"File extension '{suffix}' not in allowed extensions: {ALLOWED_EXTENSIONS}")
 
     return f"{name}_line{line_number:04d}{suffix}"
@@ -690,8 +790,11 @@ def main():
         # Parse and validate all inputs
         try:
             values_list = parse_values(args.Values, logger)
-            patterns = parse_patterns(args.Pattern)
-            templates = get_templates(args.Template, logger)
+            patterns, delimiter = parse_patterns(args.Pattern, args.allow_mixed_case, args.allow_hyphens)
+            templates = get_templates(args.Template, args.allow_any_filetype, logger)
+
+            # Log delimiter info
+            logger.info(f"Using delimiter: '{delimiter}'")
         except ValueError as e:
             logger.error(f"Invalid input: {e}")
             sys.exit(ExitCodes.INVALID_ARGUMENTS)
@@ -776,7 +879,7 @@ def main():
 
                 # Validate template patterns against provided patterns
                 try:
-                    validate_template_patterns(content, patterns, template_file.name, args.force, logger)
+                    validate_template_patterns(content, patterns, template_file.name, args.force, delimiter, logger)
                 except ValueError as e:
                     logger.error(f"Pattern validation failed for {template_file.name}: {e}")
                     if not args.force:
@@ -800,7 +903,7 @@ def main():
 
                         # Critical: Check for unreplaced patterns in output
                         try:
-                            validate_no_unreplaced_patterns(processed, template_file.name, line_num, args.force, logger)
+                            validate_no_unreplaced_patterns(processed, template_file.name, line_num, args.force, delimiter, logger)
                         except ValueError as e:
                             logger.error(f"Post-processing validation failed: {e}")
                             if not args.force:
@@ -808,7 +911,7 @@ def main():
                                 continue
 
                             # If force mode, continue with warnings already logged
-                        output_file = output_dir / generate_filename(template_file, line_num)
+                        output_file = output_dir / generate_filename(template_file, line_num, args.allow_any_filetype)
                         if create_file(output_file, processed):
                             successful += 1
                         else:
