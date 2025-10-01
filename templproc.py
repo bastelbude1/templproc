@@ -5,7 +5,7 @@ Simple Template Pattern Replacement Script
 This script processes template files by replacing defined patterns with values.
 Supports both single values and multi-column data from files.
 Enhanced with comprehensive pattern validation and force mode support.
-Version: 1.0.3
+Version: 1.1.0
 """
 
 import argparse
@@ -20,7 +20,7 @@ from typing import List, Dict, Tuple, Optional
 from contextlib import contextmanager
 
 # Script version
-__version__ = "1.0.3"
+__version__ = "1.1.0"
 
 # Exit codes for automation/scripting
 
@@ -50,17 +50,33 @@ ALLOWED_EXTENSIONS = {'.txt', '.conf', '.yaml', '.yml', '.json', '.xml', '.cfg',
 
 @contextmanager
 
-def output_file_manager(run_mode: bool, logger: logging.Logger):
+def output_file_manager(run_mode: bool, output_dir: Path, logger: logging.Logger):
+    """Context manager for tracking and cleaning up created files on failure.
 
-    """Context manager for tracking and cleaning up created files on failure."""
+    Args:
+        run_mode: Whether to actually create files (True) or dry-run (False)
+        output_dir: Output directory for security validation
+        logger: Logger instance
 
+    Yields:
+        create_file function for creating validated output files
+    """
     created_files = []
 
     def create_file(path: Path, content: str) -> bool:
+        """Create file with security validation and track it for cleanup.
 
-        """Create file and track it for cleanup."""
+        Args:
+            path: Output file path
+            content: File content
 
+        Returns:
+            True if successful, False otherwise
+        """
         try:
+            # Security: Validate output path before writing
+            validate_output_file_safety(path, output_dir)
+
             if run_mode:
                 path.write_text(content, encoding='utf-8')
                 created_files.append(path)
@@ -68,6 +84,9 @@ def output_file_manager(run_mode: bool, logger: logging.Logger):
             else:
                 logger.info(f"Would create: {path}")
             return True
+        except ValueError as e:
+            logger.error(f"Security validation failed for {path}: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error creating {path}: {e}")
             return False
@@ -281,6 +300,11 @@ def validate_inputs(patterns: List[str], values_list: List[List[str]], logger: l
                 raise ValueError(f"Value too large at row {row_idx}, column {col_idx}: "
                                f"{len(value)} chars (max {Limits.VALUE_SIZE//1024}KB)")
 
+            # Security: Check for null bytes (can cause file operation issues)
+            if '\0' in value:
+                raise ValueError(f"Null byte found in value at row {row_idx}, column {col_idx}. "
+                               "Null bytes are not allowed for security reasons.")
+
             # Check for newlines (usually unintended)
             if '\n' in value or '\r' in value:
                 logger.warning(f"Value at row {row_idx}, column {col_idx} contains newline characters")
@@ -424,24 +448,44 @@ def load_and_validate_template(template_file: Path, content_cache: Dict[Path, st
     return content
 
 def get_templates(template_path: str, logger: logging.Logger) -> List[Path]:
+    """Get list of template files with wildcard support.
 
-    """Get list of template files with wildcard support."""
+    Resolves all paths to canonical form for security.
 
+    Args:
+        template_path: Path to template file, directory, or wildcard pattern
+        logger: Logger instance
+
+    Returns:
+        List of resolved template Path objects
+
+    Raises:
+        ValueError: If no valid templates found or path resolution fails
+    """
     path = Path(template_path)
     templates = []
 
     # Try direct path first
     if path.exists():
         if path.is_file():
-            templates = [path]
+            # Resolve to canonical path (follows symlinks)
+            try:
+                resolved = path.resolve(strict=True)
+                templates = [resolved]
+            except (OSError, RuntimeError) as e:
+                raise ValueError(f"Cannot resolve template path {path}: {e}")
         elif path.is_dir():
             for f in path.iterdir():
                 if f.is_file() and f.suffix.lower() in ALLOWED_EXTENSIONS:
-                    templates.append(f)
+                    try:
+                        resolved = f.resolve(strict=True)
+                        templates.append(resolved)
+                    except (OSError, RuntimeError) as e:
+                        logger.warning(f"Cannot resolve template path {f}: {e}")
+                        continue
             if not templates:
                 raise ValueError(f"No valid template files found in {template_path}")
     else:
-
         # Try as glob pattern
         logger.info(f"Trying wildcard pattern: {template_path}")
         matches = glob.glob(template_path)
@@ -449,11 +493,17 @@ def get_templates(template_path: str, logger: logging.Logger) -> List[Path]:
             for match in matches:
                 f = Path(match)
                 if f.is_file() and f.suffix.lower() in ALLOWED_EXTENSIONS:
-                    templates.append(f)
+                    try:
+                        resolved = f.resolve(strict=True)
+                        templates.append(resolved)
+                    except (OSError, RuntimeError) as e:
+                        logger.warning(f"Cannot resolve template path {f}: {e}")
+                        continue
             if not templates:
                 raise ValueError(f"No valid template files found matching pattern: {template_path}")
         else:
             raise ValueError(f"No templates found: {template_path}")
+
     logger.info(f"Found {len(templates)} template file(s)")
     return templates
 
@@ -493,7 +543,7 @@ def validate_output_directory_safety(output_dir: Path, template_paths: List[Path
             # relative_to() raises ValueError if paths don't overlap - this is what we want
             continue
 
-        # Check if template directory is inside output directory 
+        # Check if template directory is inside output directory
         try:
             template_dir.relative_to(output_resolved)
             logger.warning(
@@ -504,6 +554,54 @@ def validate_output_directory_safety(output_dir: Path, template_paths: List[Path
 
             # relative_to() raises ValueError if paths don't overlap - this is fine
             continue
+
+def validate_output_file_safety(output_file: Path, output_dir: Path) -> None:
+    """Validate output file path for security issues.
+
+    Checks for:
+    - Symlink attacks
+    - Path traversal attempts
+    - Files escaping output directory
+
+    Args:
+        output_file: The output file path to validate
+        output_dir: The intended output directory
+
+    Raises:
+        ValueError: If path is unsafe
+    """
+    # Check if path or any parent is a symlink
+    try:
+        # Check the file itself if it exists
+        if output_file.exists() and output_file.is_symlink():
+            raise ValueError(f"Output path is a symlink (potential attack): {output_file}")
+
+        # Check all parent directories for symlinks
+        check_path = output_file.parent
+        while check_path != check_path.parent:  # Stop at root
+            if check_path.is_symlink():
+                raise ValueError(f"Output path contains symlink in directory tree (potential attack): {check_path}")
+            if check_path == output_dir:
+                break
+            check_path = check_path.parent
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Cannot validate output path safety: {e}")
+
+    # Resolve paths to canonical form and verify containment
+    try:
+        output_resolved = output_file.resolve()
+        output_dir_resolved = output_dir.resolve()
+
+        # Check if resolved output file is within output directory
+        try:
+            output_resolved.relative_to(output_dir_resolved)
+        except ValueError:
+            raise ValueError(
+                f"Output file would be written outside output directory (path traversal attempt). "
+                f"File: {output_file}, Resolved: {output_resolved}, Output dir: {output_dir_resolved}"
+            )
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Cannot resolve output paths: {e}")
 
 def process_template_with_patterns(content: str, patterns: List[str], values: List[str],
                                  template_name: str, logger: logging.Logger) -> Tuple[str, int]:
@@ -547,12 +645,33 @@ def process_template_with_patterns(content: str, patterns: List[str], values: Li
     return result, total_replacements
 
 def generate_filename(template_file: Path, line_number: int) -> str:
+    """Generate output filename with security validation.
 
-    """Generate output filename."""
+    Args:
+        template_file: Template file path
+        line_number: Line number for filename
 
-    # Fix regex: put hyphen at end of character class to avoid range interpretation
+    Returns:
+        Safe filename string
+
+    Raises:
+        ValueError: If template has unsafe file extension
+    """
+    # Sanitize the stem (filename without extension)
     name = re.sub(r'[^\w_.-]', '_', template_file.stem)
-    return f"{name}_line{line_number:04d}{template_file.suffix}"
+
+    # Security: Validate and sanitize the suffix
+    suffix = template_file.suffix.lower()
+
+    # Reject suffixes containing path separators or traversal sequences
+    if '/' in suffix or '\\' in suffix or '..' in suffix:
+        raise ValueError(f"Unsafe file extension containing path separators: {template_file.suffix}")
+
+    # Validate suffix is in allowed extensions
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise ValueError(f"File extension '{suffix}' not in allowed extensions: {ALLOWED_EXTENSIONS}")
+
+    return f"{name}_line{line_number:04d}{suffix}"
 
 def main():
 
@@ -601,8 +720,20 @@ def main():
             logger.error(f"Output directory safety check failed: {e}")
             sys.exit(ExitCodes.INVALID_ARGUMENTS)
 
-        # Calculate and validate total tasks
-        total_tasks = len(templates) * len(values_list)
+        # Calculate and validate total tasks - check BEFORE multiplication to prevent overflow
+        num_templates = len(templates)
+        num_values = len(values_list)
+
+        # Validate individual counts first
+        if num_templates > Limits.VALUE_LINES:
+            logger.error(f"Too many templates ({num_templates}) exceeds limit ({Limits.VALUE_LINES})")
+            sys.exit(ExitCodes.INVALID_ARGUMENTS)
+        if num_values > Limits.VALUE_LINES:
+            logger.error(f"Too many value rows ({num_values}) exceeds limit ({Limits.VALUE_LINES})")
+            sys.exit(ExitCodes.INVALID_ARGUMENTS)
+
+        # Now safe to multiply
+        total_tasks = num_templates * num_values
         if total_tasks > Limits.VALUE_LINES:
             logger.error(f"Total tasks ({total_tasks}) exceeds limit ({Limits.VALUE_LINES})")
             sys.exit(ExitCodes.INVALID_ARGUMENTS)
@@ -631,7 +762,7 @@ def main():
         successful = 0
         failed = 0
         template_cache = {}  # Cache template content for performance
-        with output_file_manager(args.run, logger) as create_file:
+        with output_file_manager(args.run, output_dir, logger) as create_file:
             for template_idx, template_file in enumerate(templates, 1):
                 logger.info(f"Processing template {template_idx}/{len(templates)}: {template_file.name}")
                 try:
